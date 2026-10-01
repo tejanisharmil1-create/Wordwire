@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String         @id @default(uuid())
+  email                 String         @unique
+  passwordHash          String?
+  fullName              String
+  country               String?
+  role                  Role           @default(USER)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  savedArticles         Bookmark[]
+  readingHistory        History[]
+  followingTopics       String[]       // simple array for topics
+  followingCountries    String[]       
+  notificationSettings  Json?          // Stores boolean flags for Breaking, Markets, etc.
+  newsletterSettings    Json?          // Stores subscribed newsletters
+}
+
+enum Role {
+  USER
+  EDITOR
+  ADMIN
+}
+
+model Article {
+  id             String         @id @default(uuid())
+  slug           String         @unique
+  title          String
+  subtitle       String?
+  body           String
+  heroImage      String?
+  caption        String?
+  publishedAt    DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  isPublished    Boolean        @default(false)
+  isBreaking     Boolean        @default(false)
+  
+  authorId       String?
+  author         Author?        @relation(fields: [authorId], references: [id])
+  sourceId       String?
+  source         Source?        @relation(fields: [sourceId], references: [id])
+  
+  categoryId     String
+  category       Category       @relation(fields: [categoryId], references: [id])
+  
+  countryId      String?
+  country        Country?       @relation(fields: [countryId], references: [id])
+
+  tags           ArticleTag[]
+  bookmarks      Bookmark[]
+  history        History[]
+  
+  seoTitle       String?
+  metaDesc       String?
+  originalUrl    String?        // for ingested articles
+  clusterId      String?        // for duplicate grouping
+  storyCluster   StoryCluster?  @relation(fields: [clusterId], references: [id])
+}
+
+model StoryCluster {
+  id          String    @id @default(uuid())
+  topic       String
+  createdAt   DateTime  @default(now())
+  articles    Article[]
+}
+
+model Author {
+  id        String    @id @default(uuid())
+  name      String
+  bio       String?
+  imageUrl  String?
+  articles  Article[]
+}
+
+model Source {
+  id              String    @id @default(uuid())
+  name            String
+  url             String
+  reliabilityScore Float?
+  isActive        Boolean   @default(true)
+  pollingInterval Int       @default(60) // minutes
+  lastFetchStatus String?
+  lastFetchAt     DateTime?
+  articles        Article[]
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  articles  Article[]
+}
+
+model Country {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  code      String?   // ISO code e.g., US, FR
+  articles  Article[]
+}
+
+model Tag {
+  id        String       @id @default(uuid())
+  name      String       @unique
+  slug      String       @unique
+  articles  ArticleTag[]
+}
+
+model ArticleTag {
+  articleId String
+  tagId     String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  userId    String
+  articleId String
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+}
+
+model History {
+  id        String   @id @default(uuid())
+  userId    String
+  articleId String
+  readAt    DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+}
